@@ -1,5 +1,6 @@
-# ENV files
-.*
+# Folders
+config/
+corpora/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
