@@ -6,7 +6,6 @@
 import os
 import sys
 import json
-from dotenv import load_dotenv
 from ibm_watson import SpeechToTextV1
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
@@ -73,13 +72,15 @@ def get_custom_id(stt):
 def main():
     """Customizer of an IBM Speech to Text instance."""
     campaign = sys.argv[1] # e.g. igs_bancolombia_co
-    custom_type = sys.argv[2] # e.g. words
+    custom_type = sys.argv[2] # e.g. lang
     action = sys.argv[3] # e.g. get
+
+    ibm_stt_env = get_env('config/default.json', campaign, 'ibm_stt')
+    base_lang = ibm_stt_env["model"]
 
     title_scrip('IBM STT Customizer')
     ibm_stt_env = get_env('config/default.json', campaign, 'ibm_stt')
     stt = instantiate_stt(ibm_stt_env)
-    base_lang = 'es-CO_NarrowbandModel'
 
     if custom_type == "lang":
         if action == 'create':
