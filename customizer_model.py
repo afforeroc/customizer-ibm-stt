@@ -37,64 +37,67 @@ def get_env(env_filepath, campaign, key):
     return env
 
 
-def instantiate_stt(stt_env):
+def instantiate_stt(api_key, api_url):
     """Instantiate an IBM Speech To Text API."""
-    authenticator = IAMAuthenticator(stt_env['api_key'])
+    authenticator = IAMAuthenticator(api_key)
     stt = SpeechToTextV1(authenticator=authenticator)
-    stt.set_service_url(stt_env['api_url'])
+    stt.set_service_url(api_url)
     return stt
 
-def get_custom_id(stt):
-    response = stt.list_language_models().get_result()
-    print(response)
+
+def get_custom_id(stt, custom_type):
+    if custom_type == 'language':
+        response = stt.list_language_models().get_result()
+    elif custom_type == 'acoustic':
+        response = stt.list_acoustic_models().get_result()
+    else:
+        print("The custom type is not 'language' or 'acoustic'")
+        sys.exit(1)
+    
     if len(response['customizations']) == 0:
         print("The IBM STT instance don't have custom models")
         sys.exit(1)
     elif len(response['customizations']) == 1:
         custom_id = response['customizations'][0]['customization_id']
     else: #len > 1
-        print("Custom Models")
-        custom_models = {}
+        print(f'Custom {custom_type} models')
+        custom_ids = []
         for elem in response['customizations']:
-            customization_name = elem['name']
-            customization_id = elem['customization_id']
-            if customization_id not in custom_models:
-                custom_models[customization_id] = customization_name
-            print("{}: {}".format(customization_name, customization_id))
+            print(json.dumps(elem, indent=4))
+            custom_ids.append(elem['customization_id'])
         
-        custom_id = input('Customization ID: ')
-        if custom_id not in custom_models:
-            print('The id {} not in available custom models')
+        custom_id = input(f'{custom_type} customization id: ')
+        if custom_id not in custom_ids:
+            print(f'The id {custom_id} not in available custom models')
             sys.exit(1)
     return custom_id
 
 
 def main():
     """Customizer of an IBM Speech to Text instance."""
-    campaign = sys.argv[1] # e.g. igs_bancolombia_co
-    custom_type = sys.argv[2] # e.g. lang
-    action = sys.argv[3] # e.g. get
+    custom_type = sys.argv[1] # e.g. lang
+    action = sys.argv[2] # e.g. get
 
-    ibm_stt_env = get_env('config/default.json', campaign, 'ibm_stt')
-    base_lang = ibm_stt_env["model"]
+    base_lang = "es-CO_NarrowbandModel"
 
     title_scrip('IBM STT Customizer')
-    ibm_stt_env = get_env('config/default.json', campaign, 'ibm_stt')
-    stt = instantiate_stt(ibm_stt_env)
+    api_key = "HbStGsW0y-hDhpIeokfgatJbR_ANcrYxbK0XzUgWGy1l"
+    api_url = "https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/08d0094f-65c1-4396-b6d5-de0bbfaa5b99"
+    stt = instantiate_stt(api_key, api_url)
 
-    if custom_type == "lang":
+    if custom_type == "language":
         if action == 'create':
             new_lang_model = input('New custom language model: ')
             language_model = stt.create_language_model(new_lang_model, base_lang).get_result()
-            print(json.dumps(language_model, indent=2))
+            print(json.dumps(language_model, indent=4))
         elif action == "list":
             language_models = stt.list_language_models().get_result()
-            print(json.dumps(language_models, indent=2))
+            print(json.dumps(language_models, indent=4))
         elif action in ['get', 'delete', 'train', 'reset', 'upgrade']:
-            custom_id = get_custom_id(stt)
+            custom_id = get_custom_id(stt, custom_type)
             if action == "get":
                 language_model = stt.get_language_model(custom_id).get_result()
-                print(json.dumps(language_model, indent=2))
+                print(json.dumps(language_model, indent=4))
             elif action == "delete":
                 stt.delete_language_model(custom_id)
             elif action == "train":
@@ -105,10 +108,32 @@ def main():
                 stt.upgrade_language_model(custom_id)
         else:
             print("'{}' is not valid custom language action.".format(action))
-    
+    elif custom_type == "acoustic":
+        if action == 'create':
+            new_acoustic_model = input('New custom acoustic model: ')
+            acoustic_model = stt.create_acoustic_model(new_acoustic_model, base_lang).get_result()
+            print(json.dumps(acoustic_model, indent=4))
+        elif action == "list":
+            acoustic_models = stt.list_acoustic_models().get_result()
+            print(json.dumps(acoustic_models, indent=4))
+        elif action in ['get', 'delete', 'train', 'reset', 'upgrade']:
+            custom_id = get_custom_id(stt, custom_type)
+            if action == "get":
+                acoustic_model = stt.get_acoustic_model(custom_id).get_result()
+                print(json.dumps(acoustic_model, indent=4))
+            elif action == "delete":
+                stt.delete_acoustic_model(custom_id)
+            elif action == "train":
+                stt.train_acoustic_model(custom_id)
+            elif action == "reset":
+                stt.reset_acoustic_model(custom_id)
+            elif action == "upgrade":
+                stt.upgrade_acoustic_model(custom_id)
+        else:
+            print("'{}' is not valid custom acoustic action.".format(action))
     elif custom_type == "corpora":
         if action in ['list', 'add', 'get', 'delete']:
-            custom_id = get_custom_id(stt)
+            custom_id = get_custom_id(stt, 'language')
             if action == "list":
                 corpora = stt.list_corpora(custom_id).get_result()
                 print(json.dumps(corpora, indent=2))
@@ -118,16 +143,18 @@ def main():
                     corpus_name, _ = os.path.splitext(os.path.basename(corpus_filepath))
                     stt.add_corpus(custom_id, corpus_name, corpus_file, allow_overwrite=True)
             elif action == "get":
-                corpus = stt.get_corpus(custom_id, corpus).get_result()
+                corpus_name = input('corpus name: ')
+                corpus = stt.get_corpus(custom_id, corpus_name).get_result()
                 print(json.dumps(corpus, indent=2))
             elif action == "delete":
-                stt.delete_corpus(custom_id, corpus)
+                corpus_name = input('corpus name: ')
+                stt.delete_corpus(custom_id, corpus_name)
         else:
             print("'{}' is not valid as a custom corpora action.".format(action))
     
     elif custom_type == 'words':
         if action in ['list', 'add', 'get', 'delete']:
-            custom_id = get_custom_id(stt)
+            custom_id = get_custom_id(stt, 'language')
             if action == "list":
                 words = stt.list_words(custom_id).get_result()
                 print(json.dumps(words, indent=2))
