@@ -81,8 +81,8 @@ def main():
     base_lang = "es-CO_NarrowbandModel"
 
     title_scrip('IBM STT Customizer')
-    api_key = "HbStGsW0y-hDhpIeokfgatJbR_ANcrYxbK0XzUgWGy1l"
-    api_url = "https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/08d0094f-65c1-4396-b6d5-de0bbfaa5b99"
+    api_key = ""
+    api_url = ""
     stt = instantiate_stt(api_key, api_url)
 
     if custom_type == "language":
